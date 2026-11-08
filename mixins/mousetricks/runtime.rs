@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 /// The mod's id: its row in Options > Mods and its settings folder
 /// (`horizon-mods/.horizon-mod-data/mousetricks/`).
 pub const ID: &str = "mousetricks";
-pub const VERSION: &str = "0.2.0";
+pub const VERSION: &str = "0.2.1";
 pub const DESCRIPTION: &str = "Right-drag places one item per slot, left-drag gathers or moves stacks, the wheel moves items one by one, a key or a middle click sorts.";
 /// The settings, in the mod's settings folder: what the settings page writes.
 pub const CONFIG_FILE: &str = "config.json";

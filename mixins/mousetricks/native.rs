@@ -1,4 +1,4 @@
-// Mouse Tricks' adapter to the game (Horizon 142388e1c136e622652ec7505af15d8ad195e041,
+// Mouse Tricks' adapter to the game (Horizon 36584650eaeec33553d41c4551a5b38b4a6cd0d7,
 // see horizon-mixin.toml). Injected as `crate::game::mousetricks_native`; binds
 // the game-independent drags, wheel moves and sorts in `crate::game::mousetricks`
 // (runtime.rs) to the window's inventory screens.
@@ -130,6 +130,20 @@ impl Menu for Native<'_, '_> {
     }
 }
 
+/// The winit button for a GLFW button index, as the input hook points number
+/// them (0 left, 1 right, 2 middle, 3 back, 4 forward, else the platform's
+/// own number): the inverse of the game's `glfw_button`.
+fn winit_button(button: i32) -> Option<MouseButton> {
+    Some(match button {
+        0 => MouseButton::Left,
+        1 => MouseButton::Right,
+        2 => MouseButton::Middle,
+        3 => MouseButton::Back,
+        4 => MouseButton::Forward,
+        other => MouseButton::Other(u16::try_from(other).ok()?),
+    })
+}
+
 impl Game<'_> {
     /// The open screen is one Mouse Tricks works in: the inventory, or a
     /// chest-like container (chests, barrels, ender chests, shulker boxes,
@@ -151,14 +165,28 @@ impl Game<'_> {
         slot.filter(|&s| !outside && s != 200)
     }
 
-    /// `tweaks::Game::sort_mouse_press`'s HEAD: a mouse press on any screen,
-    /// before the game handles it. On an inventory screen a left or right
-    /// press starts the drag it may become (the press itself is the game's);
-    /// a middle click on an empty spot, or the sort key bound to a mouse
-    /// button, sorts: true, and the game leaves the press alone.
-    pub(super) fn mousetricks_press(&mut self, button: MouseButton) -> bool {
+    /// `native_mouse_button_pre` (a hook point), for a press: a mouse
+    /// press (`button` as GLFW numbers it) on any screen, before the game
+    /// handles it. On an inventory screen a left or right press starts the
+    /// drag it may become (the press itself is the game's); a middle click
+    /// on an empty spot, or the sort key bound to a mouse button, sorts:
+    /// true, and the press is cancelled. A button the controls bind to a
+    /// container key (a hotbar slot, swap with the offhand) is the game's
+    /// hotkey, never a click: Mouse Tricks leaves it alone.
+    pub(super) fn mousetricks_press(&mut self, button: i32) -> bool {
         state(|s| s.drag = None);
         if !on(self) || !self.mousetricks_screen() {
+            return false;
+        }
+        let Some(button) = winit_button(button) else {
+            return false;
+        };
+        if self
+            .settings
+            .keys
+            .container_mouse_key(button, self.creative)
+            .is_some()
+        {
             return false;
         }
         let button = match button {
@@ -191,12 +219,18 @@ impl Game<'_> {
     }
 
     /// `Game::inventory_drag_move`'s HEAD: true when the move belongs to
-    /// Mouse Tricks' drag (the game's own drag doesn't grow).
+    /// Mouse Tricks' drag (the game's own drag doesn't grow). A drag whose
+    /// button is no longer held ends here, whatever let go of it (a release
+    /// another screen took, splitscreen handing the mouse over).
     pub(super) fn mousetricks_drag_move(&mut self) -> bool {
         let Some(mut drag) = state(|s| s.drag.take()) else {
             return false;
         };
-        if !on(self) || !self.mousetricks_screen() {
+        let held = match drag.button() {
+            Button::Left => MouseButton::Left,
+            Button::Right => MouseButton::Right,
+        };
+        if !on(self) || !self.mousetricks_screen() || !self.physical_buttons.contains(&held) {
             return false;
         }
         let kind = drag.button().drag_type();
@@ -214,9 +248,9 @@ impl Game<'_> {
         owned
     }
 
-    /// `Game::inventory_mouse_release`'s HEAD: the drag ends. A drag the
-    /// mod took over already dropped the game's, so the release clicks
-    /// nothing more.
+    /// `native_mouse_button_pre` (a hook point), for a release (or a press
+    /// another mod cancelled): the drag ends. A drag the mod took over
+    /// already dropped the game's, so the release clicks nothing more.
     pub(super) fn mousetricks_release(&mut self) {
         state(|s| s.drag = None);
     }
@@ -346,11 +380,10 @@ impl Game<'_> {
                 .position(|i| *i == stack.item)
                 .map_or(u64::MAX, |i| (1 << 32) + i as u64),
         };
-        let names = |id: &str| self.pack.names.display_item(id);
         Kind {
             max: self.max_stack(stack).max(1),
             order,
-            name: hover_name(&names, stack),
+            name: hover_name(&self.pack.names, stack),
             damage: stack.damage,
             pinned: Contents::of(items, stack).is_some(),
         }

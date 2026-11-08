@@ -129,33 +129,39 @@ not this mod's.
 ## Compatibility
 
 Horizon's native mods can use **hook points** (`game/native_hooks.rs`, `NATIVE_HOOKS_API`): functions kept stable from
-release to release. Mouse Tricks uses them for everything they cover:
+release to release, named in the source's `native-hooks.json` so a bundle hooks them by name (`hook = "frame"`) and keeps
+working when they move. Mouse Tricks uses them for everything they cover:
 
-- `native_mods`, `native_settings`, `native_settings_click`: the row in Options > Mods and the settings page;
+- `mods`, `settings`, `settings_click`: the row in Options > Mods and the settings page;
   `native_setting` / `native_set_setting` / `native_on` / `native_window` for the file and the off switch;
-- `native_frame`: a drag whose release never reached the inventory (the screen closed with the button down) is
+- `frame`: a drag whose release never reached the inventory (the screen closed with the button down) is
   dropped; a paced sort makes its next clicks;
-- `native_key`: the sort key (keys reach it on any screen); `NativeMod.keys` and `native_mod_key` for the key's
-  binding on the settings page.
+- `key`: the sort key (keys reach it on any screen); `NativeMod.keys` and `native_mod_key` for the key's
+  binding on the settings page;
+- `mouse_button_pre` (API 114, `InputEvent.MouseButton.Pre`): every window mouse button, pressed or released, on any
+  screen, before the game dispatches it. A left or right press notes the drag it may start (the press goes on to the
+  game); a middle click on an empty spot (or the sort key bound to a mouse button) sorts and is cancelled, as the
+  game's own sort button answers "handled". A release ends the drag. A button the controls bind to a container key
+  (a hotbar slot, swap with the offhand) is left to the game, as before.
 
-The hook points pass mouse buttons (`native_key`) and the wheel (`native_wheel`) **only while playing**, never over an
-inventory screen, so Mouse Tricks hooks four game functions directly and is **pinned** to one Horizon commit:
+The hook points that hear a drag and the wheel over a screen (`screen_mouse_dragged_pre`,
+`screen_mouse_scrolled_pre`) take the game read-only, and Mouse Tricks clicks slots right there, so it still hooks two
+game functions directly and is **pinned** to one Horizon commit:
 
 | Hook | Kind | Why it is not a hook point |
 | --- | --- | --- |
-| `tweaks::Game::sort_mouse_press` | HEAD, cancellable | Notes the drag a left or right press may start (that press goes on to the game); a middle click on an empty spot sorts and is cancelled (answering "handled", as the game's own sort button does). It is the first call every mouse press over a screen makes. `inventory_press`, the real press handler, holds a `vec!` and horizon-mixins refuses macro bodies. |
-| `Game::inventory_drag_move` | HEAD, cancellable | The cursor moving over an inventory screen: a move that belongs to a Mouse Tricks drag is cancelled so the game's quick craft drag doesn't grow; any other move goes on. |
-| `Game::inventory_mouse_release` | HEAD, not cancellable | The button went up: the drag ends. The release goes on to the game (a drag Mouse Tricks took over already told the game's click state to skip its release, as the game does after a double click). |
+| `inventory_input::Game::inventory_drag_move` | HEAD, cancellable | The cursor moving over an inventory screen: a move that belongs to a Mouse Tricks drag clicks the slot it enters and is cancelled so the game's quick craft drag doesn't grow; any other move goes on. A drag whose button is no longer held ends here. |
 | `tweaks::Game::tweak_scroll` | HEAD, cancellable | The wheel over an inventory screen, after a bundle had its turn: cancelled (answering "used") when Mouse Tricks moved items, else the game goes on. |
 
 Every item Mouse Tricks moves goes through `Game::menu_click`, the game's own click path (no hook there). The sort
 also reads the creative tabs' order (`Creative::order_of`), the shown name (`stations::hover_name`) and whether a
 stack is a bundle (`bundle::Contents::of`).
 
-Pinned: Horizon `142388e1c136e622652ec7505af15d8ad195e041`, horizon-mixins `0d6b103c70633d8fd9443d8d0acd3aadaacedb06`,
-game 26.3: the same pins as TreeFall 0.3.0 and Mason 0.2.0, so they build together into one game. Checked for 0.2.0:
-`horizon-mixins plan` and `apply` on that commit, alone (9 injections, 2 modules) and with TreeFall and LookAt
-(22 injections, 6 modules), no conflict. None of Mouse Tricks' pinned targets is hooked by either of them.
+Pinned: Horizon `36584650eaeec33553d41c4551a5b38b4a6cd0d7` (main, 2026-11-08), horizon-mixins
+`5a64af938ec86b00d53d16a408aabc0038fb3e57` (0.6.0 and later resolve `hook` names), game 26.3. 0.2.1 follows two
+changes on Horizon's main since 0.2.0: the inventory screen's mouse input moved to `game/inventory_input.rs`, and
+`stations::hover_name` takes the pack's `Names` instead of a lookup closure. Checked for 0.2.1: `horizon-mixins apply`
+and a build of the game on that commit and on main as of 2026-11-08 (`9e1abc64`).
 
 ## Build and try
 
@@ -171,7 +177,7 @@ horizon-launcher native-build <this folder> --version v0.2.97 --trust-native-cod
 
 `mixins/mousetricks/`:
 
-- `horizon-mixin.toml`: two support modules and nine HEAD hooks (above).
+- `horizon-mixin.toml`: two support modules and eight HEAD hooks (above).
 - `runtime.rs`: everything the tricks decide (when a drag becomes the mod's, which slots take an item, the wheel's
   targets and sources, the sort's section, order and click plan, its pace, the settings file and page) as pure code
   over a small `Menu` trait, with unit tests against a fake menu that clicks as the game's menus do (and fails on a
@@ -182,8 +188,8 @@ horizon-launcher native-build <this folder> --version v0.2.97 --trust-native-cod
   `crate::game::mousetricks` module.
 - `native.rs`: the adapter to the game (`crate::game::mousetricks_native`): the game's slots, carried stack and
   clicks, the sortable screens and what a sort knows of an item.
-- `press.rs`, `drag.rs`, `release.rs`, `wheel.rs`, `frame.rs`, `key.rs`, `list.rs`, `settings.rs`, `click.rs`: the
-  hook helpers.
+- `button.rs`, `drag.rs`, `wheel.rs`, `frame.rs`, `key.rs`, `list.rs`, `settings.rs`, `click.rs`: the hook
+  helpers.
 
 ```sh
 cargo test

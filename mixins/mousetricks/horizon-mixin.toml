@@ -1,16 +1,18 @@
 [mod]
 id = "mousetricks"
-version = "0.2.0"
+version = "0.2.1"
 priority = 100
 
-# Pinned: the four hooks marked "pinned" below target game functions that are
-# not native hook points (game/native_hooks.rs passes mouse buttons and the
-# wheel only while playing, never over an inventory screen), so the mod is
-# made for this one commit. Its other hooks use only hook points
-# (NATIVE_HOOKS_API 1). Each pinned target is free of macros and cfg, as
-# horizon-mixins requires of a HEAD target.
+# Pinned: the two hooks marked "pinned" below target game functions that are
+# not native hook points (the hook points that hear the drag and the wheel
+# over a screen, `screen_mouse_dragged_pre` and `screen_mouse_scrolled_pre`,
+# only read the game, and a drag or a wheel move here clicks slots), so the
+# mod is made for this one commit. Every other hook names a hook point
+# (`hook`, resolved from the source's native-hooks.json; NATIVE_HOOKS_API
+# 114). Each pinned target is free of macros and cfg, as horizon-mixins
+# requires of a HEAD target.
 [compatibility]
-horizon_revision = "142388e1c136e622652ec7505af15d8ad195e041"
+horizon_revision = "36584650eaeec33553d41c4551a5b38b4a6cd0d7"
 
 [[module]]
 id = "runtime"
@@ -24,20 +26,22 @@ file = "crates/horizon-client/src/game.rs"
 name = "mousetricks_native"
 source = "native.rs"
 
-# Pinned: a mouse press, before the game handles it. A left or right press
-# goes on (the drag it may start is noted); a middle click on an empty spot
-# sorts and is cancelled (answering "handled", as the game's own sort button
-# does). `sort_mouse_press` is the first call every mouse press over a screen
-# makes; `inventory_press` itself holds a `vec!` and can't be hooked.
+# Hook point (API 114): a window mouse button going down or up, on any
+# screen, before the game dispatches it. A left or right press goes on (the
+# drag it may start is noted); a middle click on an empty spot sorts and is
+# cancelled (the game's own sort button answers "handled" the same way). A
+# release ends the drag and goes on.
 [[injection]]
-id = "press"
+id = "button"
+hook = "mouse_button_pre"
+hook_version = 1
 kind = "HEAD"
-cancellable = true
-target = "horizon_client::game::tweaks::Game<'_>::sort_mouse_press"
-helper = "press.rs"
+helper = "button.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
-  { name = "button", ty = "winit::event::MouseButton", value = "button" },
+  { name = "button", ty = "i32", value = "button" },
+  { name = "pressed", ty = "bool", value = "pressed" },
+  { name = "canceled", ty = "&mut bool", value = "&mut *canceled" },
 ]
 
 # Pinned: the cursor moving over an inventory screen; Mouse Tricks' drags take
@@ -46,18 +50,8 @@ bindings = [
 id = "drag"
 kind = "HEAD"
 cancellable = true
-target = "horizon_client::game::Game<'_>::inventory_drag_move"
+target = "horizon_client::game::inventory_input::Game<'_>::inventory_drag_move"
 helper = "drag.rs"
-bindings = [
-  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
-]
-
-# Pinned: the button's release over an inventory screen ends the drag.
-[[injection]]
-id = "release"
-kind = "HEAD"
-target = "horizon_client::game::Game<'_>::inventory_mouse_release"
-helper = "release.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
 ]
@@ -80,7 +74,8 @@ bindings = [
 [[injection]]
 id = "frame"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_frame"
+hook = "frame"
+hook_version = 1
 helper = "frame.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
@@ -92,7 +87,8 @@ bindings = [
 [[injection]]
 id = "key"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_key"
+hook = "key"
+hook_version = 1
 helper = "key.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
@@ -104,7 +100,8 @@ bindings = [
 [[injection]]
 id = "list"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_mods"
+hook = "mods"
+hook_version = 1
 helper = "list.rs"
 bindings = [
   { name = "mods", ty = "&mut Vec<crate::game::native_hooks::NativeMod>", value = "&mut *mods" },
@@ -113,7 +110,8 @@ bindings = [
 [[injection]]
 id = "settings"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_settings"
+hook = "settings"
+hook_version = 1
 helper = "settings.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
@@ -124,7 +122,8 @@ bindings = [
 [[injection]]
 id = "click"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_settings_click"
+hook = "settings_click"
+hook_version = 1
 helper = "click.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
