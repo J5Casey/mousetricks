@@ -1,4 +1,4 @@
-// Mouse Tricks' adapter to the game (Horizon 36584650eaeec33553d41c4551a5b38b4a6cd0d7,
+// Mouse Tricks' adapter to the game (Horizon 957475f6441730bfda7e95ae6c8223a7918f6ea5,
 // see horizon-mixin.toml). Injected as `crate::game::mousetricks_native`; binds
 // the game-independent drags, wheel moves and sorts in `crate::game::mousetricks`
 // (runtime.rs) to the window's inventory screens.
@@ -218,8 +218,8 @@ impl Game<'_> {
         false
     }
 
-    /// `Game::inventory_drag_move`'s HEAD: true when the move belongs to
-    /// Mouse Tricks' drag (the game's own drag doesn't grow). A drag whose
+    /// `native_screen_mouse_dragged_pre_v2` (a hook point): true when the
+    /// move belongs to Mouse Tricks' drag (the game's own drag doesn't grow). A drag whose
     /// button is no longer held ends here, whatever let go of it (a release
     /// another screen took, splitscreen handing the mouse over).
     pub(super) fn mousetricks_drag_move(&mut self) -> bool {
@@ -255,10 +255,30 @@ impl Game<'_> {
         state(|s| s.drag = None);
     }
 
-    /// `tweaks::Game::tweak_scroll`'s HEAD: true when the wheel moved items
+    /// `native_screen_mouse_scrolled_pre_v2` (a hook point): the wheel's
+    /// vertical turn over a screen, before anything scrolls. A bundle under
+    /// the cursor with items to show keeps the wheel (it picks the item it
+    /// gives out), as the game's own wheel order has it; otherwise true when
+    /// Mouse Tricks moved items.
+    pub(super) fn mousetricks_wheel(&mut self, delta: f32) -> bool {
+        if delta == 0.0 || self.screen != Screen::Inventory {
+            return false;
+        }
+        let slot = self.inventory_target().0;
+        if let Some(stack) = slot.and_then(|s| self.slot_view(s)) {
+            let items = self.res.items();
+            let bundle = items.get(&stack.item).is_some_and(|i| i.bundle)
+                && Contents::of(items, &stack).is_some_and(|c| c.shown_count() > 0);
+            if bundle {
+                return false;
+            }
+        }
+        self.mousetricks_scroll(delta, slot)
+    }
+    /// The wheel over an inventory screen: true when the wheel moved items
     /// (or would have, over a stack it works on); false leaves the wheel to
-    /// the game. A bundle under the cursor takes the wheel before this.
-    pub(super) fn mousetricks_scroll(&mut self, delta: f32, slot: Option<usize>) -> bool {
+    /// the game.
+    fn mousetricks_scroll(&mut self, delta: f32, slot: Option<usize>) -> bool {
         let usable = on(self) && self.mousetricks_screen() && self.carried.is_none();
         let Some(config) = config(self).filter(|c| usable && c.wheel) else {
             state(|s| s.wheel.reset());

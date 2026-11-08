@@ -1,18 +1,15 @@
 [mod]
 id = "mousetricks"
-version = "0.2.1"
+version = "0.3.0"
 priority = 100
 
-# Pinned: the two hooks marked "pinned" below target game functions that are
-# not native hook points (the hook points that hear the drag and the wheel
-# over a screen, `screen_mouse_dragged_pre` and `screen_mouse_scrolled_pre`,
-# only read the game, and a drag or a wheel move here clicks slots), so the
-# mod is made for this one commit. Every other hook names a hook point
-# (`hook`, resolved from the source's native-hooks.json; NATIVE_HOOKS_API
-# 114). Each pinned target is free of macros and cfg, as horizon-mixins
-# requires of a HEAD target.
+# Every hook names a native hook point (`hook`, resolved from the source's
+# native-hooks.json), so the mod needs no pinned commit: it builds on any
+# Horizon whose NATIVE_HOOKS_API has the screen drag and wheel v2 hooks
+# (horizon-rust/horizon#12286). Until that API is stamped with a number,
+# the commit below is the engine branch it was built and tested on.
 [compatibility]
-horizon_revision = "36584650eaeec33553d41c4551a5b38b4a6cd0d7"
+horizon_revision = "957475f6441730bfda7e95ae6c8223a7918f6ea5"
 
 [[module]]
 id = "runtime"
@@ -44,29 +41,34 @@ bindings = [
   { name = "canceled", ty = "&mut bool", value = "&mut *canceled" },
 ]
 
-# Pinned: the cursor moving over an inventory screen; Mouse Tricks' drags take
-# the move (the game's quick craft drag then doesn't grow).
+# Hook point: a held button moving over a screen, before any screen drag
+# handler. A move that belongs to a Mouse Tricks drag clicks the slot it
+# entered and is cancelled (the game's quick craft drag then doesn't grow);
+# any other goes on.
 [[injection]]
 id = "drag"
+hook = "screen_mouse_dragged_pre_v2"
+hook_version = 1
 kind = "HEAD"
-cancellable = true
-target = "horizon_client::game::inventory_input::Game<'_>::inventory_drag_move"
 helper = "drag.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "canceled", ty = "&mut bool", value = "&mut *canceled" },
 ]
 
-# Pinned: the wheel over an inventory screen moves items one by one.
+# Hook point: the wheel over a screen, before anything scrolls. Over a stack
+# it works on, Mouse Tricks moves items one by one and cancels the turn; a
+# bundle under the cursor keeps its own wheel.
 [[injection]]
 id = "wheel"
+hook = "screen_mouse_scrolled_pre_v2"
+hook_version = 1
 kind = "HEAD"
-cancellable = true
-target = "horizon_client::game::tweaks::Game<'_>::tweak_scroll"
 helper = "wheel.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
-  { name = "delta", ty = "f32", value = "delta" },
-  { name = "slot", ty = "Option<usize>", value = "slot" },
+  { name = "scroll", ty = "[f64; 2]", value = "scroll" },
+  { name = "canceled", ty = "&mut bool", value = "&mut *canceled" },
 ]
 
 # Hook point: a drag whose release went to another screen ends; a paced sort

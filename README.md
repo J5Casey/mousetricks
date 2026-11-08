@@ -143,25 +143,21 @@ working when they move. Mouse Tricks uses them for everything they cover:
   game); a middle click on an empty spot (or the sort key bound to a mouse button) sorts and is cancelled, as the
   game's own sort button answers "handled". A release ends the drag. A button the controls bind to a container key
   (a hotbar slot, swap with the offhand) is left to the game, as before.
+- `screen_mouse_dragged_pre_v2` (horizon-rust/horizon#12286): a held button moving over a screen, before any screen
+  drag handler, with the game lent mutably. A move that belongs to a Mouse Tricks drag clicks the slot it enters and is
+  cancelled, so the game's quick craft drag doesn't grow; any other move goes on. A drag whose button is no longer
+  held ends here.
+- `screen_mouse_scrolled_pre_v2` (horizon-rust/horizon#12286): the wheel over a screen, before anything scrolls, with
+  the game lent mutably. Over a stack it works on, Mouse Tricks moves items and cancels the turn. A bundle under the
+  cursor with items to show keeps its own wheel, as before.
 
-The hook points that hear a drag and the wheel over a screen (`screen_mouse_dragged_pre`,
-`screen_mouse_scrolled_pre`) take the game read-only, and Mouse Tricks clicks slots right there, so it still hooks two
-game functions directly and is **pinned** to one Horizon commit:
-
-| Hook | Kind | Why it is not a hook point |
-| --- | --- | --- |
-| `inventory_input::Game::inventory_drag_move` | HEAD, cancellable | The cursor moving over an inventory screen: a move that belongs to a Mouse Tricks drag clicks the slot it enters and is cancelled so the game's quick craft drag doesn't grow; any other move goes on. A drag whose button is no longer held ends here. |
-| `tweaks::Game::tweak_scroll` | HEAD, cancellable | The wheel over an inventory screen, after a bundle had its turn: cancelled (answering "used") when Mouse Tricks moved items, else the game goes on. |
+Mouse Tricks hooks no game function directly. Once #12286's API is stamped with a number, `horizon-native.json` names
+it (`"hooks": N`) instead of a commit and the mod builds on any Horizon from then on. Until then it is pinned to the
+engine branch it was built and tested on: Horizon `957475f6441730bfda7e95ae6c8223a7918f6ea5`.
 
 Every item Mouse Tricks moves goes through `Game::menu_click`, the game's own click path (no hook there). The sort
 also reads the creative tabs' order (`Creative::order_of`), the shown name (`stations::hover_name`) and whether a
 stack is a bundle (`bundle::Contents::of`).
-
-Pinned: Horizon `36584650eaeec33553d41c4551a5b38b4a6cd0d7` (main, 2026-11-08), horizon-mixins
-`5a64af938ec86b00d53d16a408aabc0038fb3e57` (0.6.0 and later resolve `hook` names), game 26.3. 0.2.1 follows two
-changes on Horizon's main since 0.2.0: the inventory screen's mouse input moved to `game/inventory_input.rs`, and
-`stations::hover_name` takes the pack's `Names` instead of a lookup closure. Checked for 0.2.1: `horizon-mixins apply`
-and a build of the game on that commit and on main as of 2026-11-08 (`9e1abc64`).
 
 ## Build and try
 
