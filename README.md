@@ -165,7 +165,8 @@ Pinned: Horizon `a3bf6531e07f6292414eda44773d30ab0a47f9db` (horizon-rust/horizon
 `5a64af938ec86b00d53d16a408aabc0038fb3e57` (0.6.0 and later resolve `hook` names), game 26.3. 0.2.2 asks Horizon what
 each slot of the open menu is for (`Game::native_slot_roles`) instead of keeping its own list of menu type ids, so
 it works in the crafting table and in content mods' menus too. #13096 has merged but its fragment is not stamped with
-an API number yet; the two pinned targets above keep the mod on one commit either way.
+an API number yet; the two pinned targets above keep the mod on one commit either way. Checked on that commit with
+Braid's mod set: the wheel over a Crafting Station's grid slot trades with the inventory.
 
 ## Build and try
 
