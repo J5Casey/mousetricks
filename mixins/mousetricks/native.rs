@@ -1,4 +1,4 @@
-// Mouse Tricks' adapter to the game (Horizon 36584650eaeec33553d41c4551a5b38b4a6cd0d7,
+// Mouse Tricks' adapter to the game (Horizon 77181039ec37e384de5d989e62db79ee33311da4,
 // see horizon-mixin.toml). Injected as `crate::game::mousetricks_native`; binds
 // the game-independent drags, wheel moves and sorts in `crate::game::mousetricks`
 // (runtime.rs) to the window's inventory screens.
@@ -11,9 +11,8 @@ use super::mousetricks::{
     self as mt, Button, Click, Config, Drag, Effect, Kind, Layout, Loaded, Menu, Moment, Press,
     Sorting, Wheel,
 };
-use super::{Game, Screen};
+use super::{Game, NativeSlotRole, Screen};
 use horizon_client::bundle::Contents;
-use horizon_client::containers::BlockEntity;
 use horizon_client::hud::HudBatch;
 use horizon_client::items::ItemStack;
 use horizon_client::keybinds;
@@ -144,25 +143,52 @@ fn winit_button(button: i32) -> Option<MouseButton> {
     })
 }
 
+/// The slots of `roles` that have `role`, in the menu's order.
+fn with_role(roles: &[(usize, NativeSlotRole)], role: NativeSlotRole) -> Vec<usize> {
+    roles
+        .iter()
+        .filter(|(_, r)| *r == role)
+        .map(|&(s, _)| s)
+        .collect()
+}
+
 impl Game<'_> {
-    /// The open screen is one Mouse Tricks works in: the inventory, or a
-    /// chest-like container (chests, barrels, ender chests, shulker boxes,
-    /// hoppers, dispensers), where every slot is a plain one. Never a
-    /// station (furnace, anvil...), a mount's inventory or the creative one.
-    fn mousetricks_screen(&self) -> bool {
-        if self.screen != Screen::Inventory || self.station.is_some() || self.mount_active() {
-            return false;
-        }
-        if self.remote.is_some() {
-            self.remote_storage_open()
-        } else {
-            matches!(self.container_kind(), None | Some(BlockEntity::Chest(_)))
-        }
+    /// The open menu's slots with their roles, when it is one Mouse Tricks
+    /// works in: every slot plain storage, the player's, a crafting grid or a
+    /// result (the inventory, chests, barrels, ender chests, shulker boxes,
+    /// hoppers, dispensers, the crafting table, a mount's chest, a mod's
+    /// menu with a crafting grid and storage). None on a screen with a
+    /// machine's own slots (furnace, anvil, villager...), the creative one or
+    /// no menu at all: there the screen clicks as the game's own. Horizon
+    /// says what each slot is for (`native_slot_roles`), so a mod's menu
+    /// type is known by what its JSON declares.
+    fn mousetricks_roles(&self) -> Option<Vec<(usize, NativeSlotRole)>> {
+        let roles = self.native_slot_roles();
+        let plain = roles.iter().all(|(_, r)| {
+            matches!(
+                r,
+                NativeSlotRole::Hotbar
+                    | NativeSlotRole::Inventory
+                    | NativeSlotRole::Equipment
+                    | NativeSlotRole::Storage
+                    | NativeSlotRole::CraftingGrid
+                    | NativeSlotRole::Result
+            )
+        });
+        (plain && !roles.is_empty()).then_some(roles)
     }
-    /// The slot under the cursor (never the crafting result).
+    fn mousetricks_screen(&self) -> bool {
+        self.mousetricks_roles().is_some()
+    }
+    /// The slot under the cursor (never a result).
     fn mousetricks_hovered(&self) -> Option<usize> {
         let (slot, outside) = self.inventory_target();
-        slot.filter(|&s| !outside && s != 200)
+        let slot = slot.filter(|_| !outside)?;
+        let roles = self.mousetricks_roles()?;
+        let result = roles
+            .iter()
+            .any(|&(s, r)| s == slot && r == NativeSlotRole::Result);
+        (!result).then_some(slot)
     }
 
     /// `native_mouse_button_pre` (a hook point), for a press: a mouse
@@ -259,17 +285,16 @@ impl Game<'_> {
     /// (or would have, over a stack it works on); false leaves the wheel to
     /// the game. A bundle under the cursor takes the wheel before this.
     pub(super) fn mousetricks_scroll(&mut self, delta: f32, slot: Option<usize>) -> bool {
-        let usable = on(self) && self.mousetricks_screen() && self.carried.is_none();
-        let Some(config) = config(self).filter(|c| usable && c.wheel) else {
+        let roles = self
+            .mousetricks_roles()
+            .filter(|_| on(self) && self.carried.is_none());
+        let (Some(roles), Some(config)) = (roles, config(self).filter(|c| c.wheel)) else {
             state(|s| s.wheel.reset());
             return false;
         };
         let layout = Layout {
-            container: self
-                .slots()
-                .into_iter()
-                .filter(|s| (300..500).contains(s))
-                .collect(),
+            container: with_role(&roles, NativeSlotRole::Storage),
+            grid: with_role(&roles, NativeSlotRole::CraftingGrid),
         };
         let Some(slot) = slot.filter(|&s| !layout.other_side(s).is_empty()) else {
             state(|s| s.wheel.reset());
@@ -315,32 +340,13 @@ impl Game<'_> {
         self.native_mod_key(mt::ID, mt::SORT_KEY, mt::SORT_KEY_DEFAULT)
     }
 
-    /// The open container's slots when it is plain storage a sort works in
-    /// (chests, barrels, ender chests, shulker boxes; none for the inventory
-    /// screen). None on the screens a sort leaves alone: hoppers,
-    /// dispensers, crafting tables, and every screen Mouse Tricks does
-    /// (furnaces, anvils, a mount's inventory, the creative screen...).
+    /// The open menu's storage slots a sort works in (a chest's, a hopper's,
+    /// a mod menu's linked slots; none on the inventory screen or a crafting
+    /// table, where only the inventory sorts). None on the screens Mouse
+    /// Tricks leaves alone (furnaces, anvils, the creative screen...).
     fn mousetricks_storage(&self) -> Option<Vec<usize>> {
-        if !self.mousetricks_screen() {
-            return None;
-        }
-        let storage = if self.remote.is_some() {
-            self.remote_storage_open()
-        } else {
-            match self.container_kind() {
-                None => true,
-                Some(BlockEntity::Chest(_)) => {
-                    self.chest_rows().is_some() || self.container_block_is_shulker()
-                }
-                Some(_) => false,
-            }
-        };
-        storage.then(|| {
-            self.slots()
-                .into_iter()
-                .filter(|s| (300..500).contains(s))
-                .collect()
-        })
+        let roles = self.mousetricks_roles()?;
+        Some(with_role(&roles, NativeSlotRole::Storage))
     }
     /// The cursor is nearer the container's slots than the inventory's.
     fn mousetricks_near(&self, container: &[usize]) -> bool {

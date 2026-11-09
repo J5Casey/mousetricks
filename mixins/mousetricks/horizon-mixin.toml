@@ -1,6 +1,6 @@
 [mod]
 id = "mousetricks"
-version = "0.2.1"
+version = "0.2.2"
 priority = 100
 
 # Pinned: the two hooks marked "pinned" below target game functions that are
@@ -12,7 +12,7 @@ priority = 100
 # 114). Each pinned target is free of macros and cfg, as horizon-mixins
 # requires of a HEAD target.
 [compatibility]
-horizon_revision = "36584650eaeec33553d41c4551a5b38b4a6cd0d7"
+horizon_revision = "77181039ec37e384de5d989e62db79ee33311da4"
 
 [[module]]
 id = "runtime"

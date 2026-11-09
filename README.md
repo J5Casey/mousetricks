@@ -29,11 +29,13 @@ and Mouse Tricks needs nothing on the server.
 | **Wheel** | With an empty hand, turn the wheel over a stack: **down** sends one of its items to the other side (onto a stack of it with room, else into the first empty slot, as a Shift click fills them), **up** brings one of the same item back into the stack. The other side is the container when one is open; in your own inventory, the hotbar and the main inventory trade. A bundle under the cursor keeps its own wheel. | `wheel` |
 | **Sort** | With an empty hand, press the sort key (**R** by default) or **middle-click** an empty slot or the window's background: the part of the screen under the cursor is sorted (see below). A middle click on a stack is still the game's (pick block in creative). | `sort` |
 
-Where: the player's inventory screen (crafting grid and armour slots included for the drags) and the chest-like
-containers whose slots are all plain ones (the same set Horizon's own inventory extra works in): chests, barrels,
-ender chests and shulker boxes, in single player (whose window is a client of its own server thread), on LAN and on
-servers; with `--in-frame` single player also hoppers, dispensers and the crafting table. Other screens (furnaces,
-anvils, villagers, a horse's inventory, the creative inventory) click exactly as before.
+Where: every menu whose slots are all plain ones, as Horizon describes the open menu's slots (`native_slot_roles`):
+the player's inventory screen (crafting grid and armour slots included for the drags), chests, barrels, ender chests,
+shulker boxes, hoppers, dispensers and droppers, the crafting table, the crafter, a horse's or llama's chest, and a
+content mod's menu type whose slots are all storage, a crafting grid or results (a crafting station with linked
+chests, say), in single player, on LAN and on servers. Screens with a machine's own slots (furnaces, brewing stands,
+anvils, villagers, enchanting tables) and the creative inventory click exactly as before. The wheel over a crafting
+grid's slot trades with your inventory (down sends one item back, up brings one more of it into the grid).
 
 ## Sorting
 
@@ -46,8 +48,9 @@ The sort works on one part of the screen, the one under the cursor:
 - over the window's background, the part whose slots are nearest the cursor.
 
 It does nothing with a stack in your hand, while the recipe book's search box has the keys, in the creative screen
-(its item tabs and its inventory tab), and on screens that aren't plain storage: furnaces, crafting tables, anvils,
-hoppers, dispensers, a horse's inventory and the like (there the key and the middle click are the game's).
+(its item tabs and its inventory tab), and on screens with a machine's own slots: furnaces, anvils, villagers and the
+like (there the key and the middle click are the game's). On a crafting table only your inventory sorts; a crafting
+grid is never sorted.
 
 **The order.** First a kind's partial stacks are merged: stacks merge only when they are the same item with the same
 components, so items that differ in name, enchantments, damage or anything else stay apart. Then the stacks are
@@ -157,11 +160,12 @@ Every item Mouse Tricks moves goes through `Game::menu_click`, the game's own cl
 also reads the creative tabs' order (`Creative::order_of`), the shown name (`stations::hover_name`) and whether a
 stack is a bundle (`bundle::Contents::of`).
 
-Pinned: Horizon `36584650eaeec33553d41c4551a5b38b4a6cd0d7` (main, 2026-11-08), horizon-mixins
-`5a64af938ec86b00d53d16a408aabc0038fb3e57` (0.6.0 and later resolve `hook` names), game 26.3. 0.2.1 follows two
-changes on Horizon's main since 0.2.0: the inventory screen's mouse input moved to `game/inventory_input.rs`, and
-`stations::hover_name` takes the pack's `Names` instead of a lookup closure. Checked for 0.2.1: `horizon-mixins apply`
-and a build of the game on that commit and on main as of 2026-11-08 (`9e1abc64`).
+Pinned: Horizon `77181039ec37e384de5d989e62db79ee33311da4` (J5Casey/horizon `braid/dev4b`: Braid's `braid/dev3` with
+`native_slot_roles`, horizon-rust/horizon#13033, not merged yet), horizon-mixins
+`5a64af938ec86b00d53d16a408aabc0038fb3e57` (0.6.0 and later resolve `hook` names), game 26.3. 0.2.2 asks Horizon what
+each slot of the open menu is for (`Game::native_slot_roles`) instead of keeping its own list of menu type ids, so
+it works in the crafting table and in content mods' menus too. Once #13033 merges, the pin moves back to Horizon's
+main.
 
 ## Build and try
 

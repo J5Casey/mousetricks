@@ -1,8 +1,8 @@
 {
   "game": "26.3",
-  "horizon": "36584650eaeec33553d41c4551a5b38b4a6cd0d7",
+  "horizon": "77181039ec37e384de5d989e62db79ee33311da4",
   "id": "mousetricks",
   "mixins": "5a64af938ec86b00d53d16a408aabc0038fb3e57",
   "schema": 1,
-  "version": "0.2.1"
+  "version": "0.2.2"
 }

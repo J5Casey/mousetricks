@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 /// The mod's id: its row in Options > Mods and its settings folder
 /// (`horizon-mods/.horizon-mod-data/mousetricks/`).
 pub const ID: &str = "mousetricks";
-pub const VERSION: &str = "0.2.1";
+pub const VERSION: &str = "0.2.2";
 pub const DESCRIPTION: &str = "Right-drag places one item per slot, left-drag gathers or moves stacks, the wheel moves items one by one, a key or a middle click sorts.";
 /// The settings, in the mod's settings folder: what the settings page writes.
 pub const CONFIG_FILE: &str = "config.json";
@@ -375,12 +375,14 @@ fn matching<M: Menu>(menu: &mut M, slot: usize, shift: bool) {
     }
 }
 
-/// The open screen's layout for the wheel: the container's slots (300 and
-/// up, in order), none for the inventory screen. Slots 0..9 are the hotbar,
-/// 9..36 the main inventory.
+/// The open screen's layout for the wheel: its storage slots (a chest's, a
+/// mod menu's linked slots, in order) and its crafting grid's, both empty for
+/// the inventory screen's own. Slots 0..9 are the hotbar, 9..36 the main
+/// inventory.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Layout {
     pub container: Vec<usize>,
+    pub grid: Vec<usize>,
 }
 
 const HOTBAR: std::ops::Range<usize> = 0..9;
@@ -388,12 +390,14 @@ const MAIN: std::ops::Range<usize> = 9..36;
 
 impl Layout {
     /// The slots across from `slot` in quick-move order (where a Shift click
-    /// would put its stack): a container's go to the inventory, hotbar first
-    /// from its right end; the inventory's go to the container; without
-    /// one, the hotbar and the main inventory trade. Empty for other slots.
+    /// would put its stack): a container's or a crafting grid's go to the
+    /// inventory, hotbar first from its right end; the inventory's go to the
+    /// container; without one, the hotbar and the main inventory trade (a
+    /// crafting grid only ever sends back, as a Shift click never fills one).
+    /// Empty for other slots.
     pub fn other_side(&self, slot: usize) -> Vec<usize> {
         let player = || HOTBAR.rev().chain(MAIN.rev());
-        if self.container.contains(&slot) {
+        if self.container.contains(&slot) || self.grid.contains(&slot) {
             player().collect()
         } else if !MAIN.contains(&slot) && !HOTBAR.contains(&slot) {
             Vec::new()
@@ -414,10 +418,12 @@ impl Layout {
     }
     /// `slot` is above the other side on screen.
     pub fn upper(&self, slot: usize) -> bool {
-        if self.container.is_empty() {
+        if self.container.contains(&slot) || self.grid.contains(&slot) {
+            true
+        } else if self.container.is_empty() {
             MAIN.contains(&slot)
         } else {
-            self.container.contains(&slot)
+            false
         }
     }
 }
@@ -1148,6 +1154,7 @@ mod tests {
             Self {
                 layout: Layout {
                     container: (300..327).collect(),
+                    ..Layout::default()
                 },
                 ..Self::default()
             }
@@ -1591,6 +1598,7 @@ mod tests {
     fn layout_follows_quick_move_order() {
         let chest = Layout {
             container: (300..327).collect(),
+            ..Layout::default()
         };
         let mut player: Vec<usize> = (0..9).rev().collect();
         player.extend((9..36).rev());
@@ -1607,6 +1615,32 @@ mod tests {
         let mut screen: Vec<usize> = (9..36).collect();
         screen.extend(0..9);
         assert_eq!(chest.screen_order(301), screen);
+    }
+
+    #[test]
+    fn a_crafting_grid_trades_with_the_inventory() {
+        let mut player: Vec<usize> = (0..9).rev().collect();
+        player.extend((9..36).rev());
+        // A crafting table: the grid sends to the inventory and brings from
+        // it; the inventory's own slots still trade hotbar and main.
+        let table = Layout {
+            grid: (100..109).collect(),
+            ..Layout::default()
+        };
+        assert_eq!(table.other_side(104), player);
+        assert_eq!(table.other_side(3), (9..36).collect::<Vec<_>>());
+        assert!(table.other_side(200).is_empty());
+        assert!(table.upper(100) && table.upper(9) && !table.upper(0));
+        // A station: its storage is the inventory's other side, the grid
+        // still sends to the inventory.
+        let station = Layout {
+            container: (310..337).collect(),
+            grid: (301..310).collect(),
+        };
+        assert_eq!(station.other_side(20), (310..337).collect::<Vec<_>>());
+        assert_eq!(station.other_side(301), player);
+        assert_eq!(station.other_side(310), player);
+        assert!(station.upper(301) && station.upper(310) && !station.upper(20));
     }
 
     #[test]
