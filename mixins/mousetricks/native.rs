@@ -1,4 +1,4 @@
-// Mouse Tricks' adapter to the game (Horizon 30c7c35db15d7d4d433cc8016d4c5bdc74bb5d90,
+// Mouse Tricks' adapter to the game (Horizon bc3dcdd7cf560a11b9d6f4414e7c42cdc79bcfe7,
 // see horizon-mixin.toml). Injected as `crate::game::mousetricks_native`; binds
 // the game-independent drags, wheel moves and sorts in `crate::game::mousetricks`
 // (runtime.rs) to the window's inventory screens.

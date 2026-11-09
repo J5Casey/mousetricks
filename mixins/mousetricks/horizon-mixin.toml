@@ -12,7 +12,7 @@ priority = 100
 # 114). Each pinned target is free of macros and cfg, as horizon-mixins
 # requires of a HEAD target.
 [compatibility]
-horizon_revision = "30c7c35db15d7d4d433cc8016d4c5bdc74bb5d90"
+horizon_revision = "bc3dcdd7cf560a11b9d6f4414e7c42cdc79bcfe7"
 
 [[module]]
 id = "runtime"

@@ -160,7 +160,7 @@ Every item Mouse Tricks moves goes through `Game::menu_click`, the game's own cl
 also reads the creative tabs' order (`Creative::order_of`), the shown name (`stations::hover_name`) and whether a
 stack is a bundle (`bundle::Contents::of`).
 
-Pinned: Horizon `30c7c35db15d7d4d433cc8016d4c5bdc74bb5d90` (J5Casey/horizon `braid/dev5`: Braid's `braid/dev3` with
+Pinned: Horizon `bc3dcdd7cf560a11b9d6f4414e7c42cdc79bcfe7` (J5Casey/horizon `braid/dev5`: Braid's `braid/dev3` with
 `native_slot_roles`, horizon-rust/horizon#13033, not merged yet), horizon-mixins
 `5a64af938ec86b00d53d16a408aabc0038fb3e57` (0.6.0 and later resolve `hook` names), game 26.3. 0.2.2 asks Horizon what
 each slot of the open menu is for (`Game::native_slot_roles`) instead of keeping its own list of menu type ids, so
