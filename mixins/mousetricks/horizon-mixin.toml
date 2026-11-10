@@ -12,7 +12,8 @@ priority = 100
 # 114). Each pinned target is free of macros and cfg, as horizon-mixins
 # requires of a HEAD target.
 [compatibility]
-horizon_revision = "a3bf6531e07f6292414eda44773d30ab0a47f9db"
+# Pinned to J5Casey braid/template-fishing-rod (a3bf653 + arismoko/horizon#2588) until that fix reaches upstream.
+horizon_revision = "b756be188fbd1d486aa73aaa028b205ffa89d1b8"
 
 [[module]]
 id = "runtime"
