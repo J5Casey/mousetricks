@@ -13,7 +13,7 @@ priority = 100
 # requires of a HEAD target.
 [compatibility]
 # Pinned to J5Casey braid/dev10 (a3bf653 + arismoko/horizon#2588 + the panel_style Classic PR) until those reach upstream.
-horizon_revision = "5422feba7b59fe216e344bc594e1e68a99082627"
+horizon_revision = "2044c58ee6d268184095d2bf1a0a7f98c63ca3bf"
 
 [[module]]
 id = "runtime"
