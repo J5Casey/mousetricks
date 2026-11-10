@@ -12,8 +12,8 @@ priority = 100
 # 114). Each pinned target is free of macros and cfg, as horizon-mixins
 # requires of a HEAD target.
 [compatibility]
-# Pinned to J5Casey braid/dev8 (a3bf653 + arismoko/horizon#2588 + the panel_style Classic PR) until those reach upstream.
-horizon_revision = "63baee208956f45bfacd516f7979db5142c2dfb1"
+# Pinned to J5Casey braid/dev9 (a3bf653 + arismoko/horizon#2588 + the panel_style Classic PR) until those reach upstream.
+horizon_revision = "2118dcefa1914c516ff3b61831cf17d7719cddce"
 
 [[module]]
 id = "runtime"
