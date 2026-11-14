@@ -1,31 +1,20 @@
-// Mouse Tricks: inventory mouse drags, wheel moves and sorting.
-//
-// Original implementation for Horizon (a horizon-mixins native mod). This file
-// is both the standalone, unit-tested Cargo library and the injected
-// `crate::game::mousetricks` module. It has no Horizon dependency: the open
-// screen is reached only through the small `Menu` trait, which `native.rs`
-// implements with the game's own slot clicks (the same clicks a player's
-// hand makes, so a server sees nothing but ordinary clicks).
+//! Mouse Tricks' engine: inventory mouse drags, wheel moves and sorting.
+//!
+//! Original implementation for Horizon. It knows nothing of Horizon: the open
+//! screen is reached only through the small `Menu` trait, which the mod's glue
+//! (`lib.rs`) implements with the mod API's menu reads and clicks (the same
+//! clicks a player's hand makes, so a server sees nothing but ordinary
+//! clicks). `engine/Cargo.toml` builds this file on its own, so its tests run
+//! with plain `cargo test` and no SDK.
 
-use serde::{Deserialize, Serialize};
-
-/// The mod's id: its row in Options > Mods and its settings folder
-/// (`horizon-mods/.horizon-mod-data/mousetricks/`).
+/// The mod's id: its row in Options > Mods, its settings and its key.
 pub const ID: &str = "mousetricks";
-pub const VERSION: &str = "0.2.2";
-pub const DESCRIPTION: &str = "Right-drag places one item per slot, left-drag gathers or moves stacks, the wheel moves items one by one, a key or a middle click sorts.";
-/// The settings, in the mod's settings folder: what the settings page writes.
-pub const CONFIG_FILE: &str = "config.json";
-/// The mod's keys (Options > Mods > Mouse Tricks lists them above the
-/// settings): name, label, default key.
-pub const KEYS: [[&str; 3]; 1] = [[SORT_KEY, "Sort the inventory", SORT_KEY_DEFAULT]];
-/// The sort key's name among the mod's keys.
+/// The sort key's id among the mod's keys (Controls lists it under Mouse Tricks).
 pub const SORT_KEY: &str = "sort";
 pub const SORT_KEY_DEFAULT: &str = "key.keyboard.r";
 
 /// Which way the wheel sends the hovered stack's items.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WheelDirection {
     /// Down sends one item to the other side, up brings one back.
     Normal,
@@ -38,16 +27,14 @@ pub enum WheelDirection {
 }
 
 /// Where the wheel looks first for an item to bring back.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WheelSearch {
     FirstToLast,
     LastToFirst,
 }
 
 /// The order a sort puts stacks in.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SortOrder {
     /// The creative tabs' order of the items (the item registry's after
     /// them), then the name.
@@ -58,8 +45,7 @@ pub enum SortOrder {
     Count,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(default, deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Config {
     /// Right-drag holding a stack: one item into each slot entered, at once,
     /// and one more each time a slot is entered again.
@@ -95,21 +81,64 @@ impl Default for Config {
         }
     }
 }
-impl Config {
-    pub fn from_json(source: &str) -> Result<Self, String> {
-        serde_json::from_str(source).map_err(|e| e.to_string())
-    }
-    /// The file the settings page writes: every key, readable by `from_json`.
-    pub fn to_json(&self) -> String {
-        let mut json = serde_json::to_string_pretty(self).unwrap_or_default();
-        json.push('\n');
-        json
-    }
+/// A setting on Mouse Tricks' page in Options > Mods: its key, and what it is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Setting {
+    /// On or off, with its default.
+    Toggle(&'static str, bool),
+    /// One of the option keys (the last part of each option's translation
+    /// key), by index, with the default's index.
+    Choice(&'static str, &'static [&'static str], usize),
 }
 
-/// The configuration as read from [`CONFIG_FILE`]: Err when the file is
-/// broken (Mouse Tricks then does nothing until it is fixed or reset).
-pub type Loaded = Result<Config, String>;
+/// The page's settings, in order. Labels are `mousetricks.setting.<key>`,
+/// a choice's options `mousetricks.setting.<key>.<option>`.
+pub const SETTINGS: [Setting; 9] = [
+    Setting::Toggle("right_drag", true),
+    Setting::Toggle("left_drag", true),
+    Setting::Toggle("shift_drag", true),
+    Setting::Toggle("wheel", true),
+    Setting::Choice("wheel_direction", &["normal", "inverted", "positional"], 0),
+    Setting::Choice("wheel_search", &["last_to_first", "first_to_last"], 0),
+    Setting::Toggle("sort", true),
+    Setting::Choice("sort_order", &["registry", "name", "count"], 0),
+    Setting::Toggle("sort_hotbar", false),
+];
+
+impl Config {
+    /// The settings as the game keeps them: `toggle` and `choice` read one
+    /// by key (None, a value never set or unreadable, is its default).
+    pub fn read(
+        toggle: impl Fn(&str) -> Option<bool>,
+        choice: impl Fn(&str) -> Option<u32>,
+    ) -> Self {
+        let d = Self::default();
+        let on = |key: &str, default: bool| toggle(key).unwrap_or(default);
+        let pick = |key: &str| choice(key).unwrap_or(0);
+        Self {
+            right_drag: on("right_drag", d.right_drag),
+            left_drag: on("left_drag", d.left_drag),
+            shift_drag: on("shift_drag", d.shift_drag),
+            wheel: on("wheel", d.wheel),
+            wheel_direction: match pick("wheel_direction") {
+                1 => WheelDirection::Inverted,
+                2 => WheelDirection::Positional,
+                _ => WheelDirection::Normal,
+            },
+            wheel_search: match pick("wheel_search") {
+                1 => WheelSearch::FirstToLast,
+                _ => WheelSearch::LastToFirst,
+            },
+            sort: on("sort", d.sort),
+            sort_order: match pick("sort_order") {
+                1 => SortOrder::Name,
+                2 => SortOrder::Count,
+                _ => SortOrder::Registry,
+            },
+            sort_hotbar: on("sort_hotbar", d.sort_hotbar),
+        }
+    }
+}
 
 /// One ordinary slot click, as the player's mouse makes it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -372,6 +401,87 @@ fn matching<M: Menu>(menu: &mut M, slot: usize, shift: bool) {
     {
         // The hand's stack goes into the slot, then the slot's comes up whole.
         menu.click(slot, Click::Left);
+    }
+}
+
+/// The game's own quick craft drag of a press Mouse Tricks takes from the
+/// game (a press holding a stack, which the game would turn into its drag):
+/// the slots the game's drag would have spread over by now
+/// (`quickCraftSlots`), so that what the game does with the drag is still
+/// done when the drag never becomes the mod's.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct QuickCraft {
+    button: Button,
+    slots: Vec<usize>,
+}
+
+/// What the game does on the release of a press Mouse Tricks took from it,
+/// when the drag never became the mod's (`mouseReleased`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Release {
+    /// The drag spread the stack over these slots (`QUICK_CRAFT`, evenly for
+    /// the left button, one each for the right).
+    Spread(Button, Vec<usize>),
+    /// One ordinary click.
+    Click(usize, Click),
+    /// The stack (the left button) or one item (the right) dropped outside
+    /// the window.
+    Throw(Button),
+    Nothing,
+}
+
+impl QuickCraft {
+    /// The press: the game's drag starts on the pressed slot when it takes
+    /// the stack, Shift or not, unless Shift is down (then it starts empty).
+    pub fn start<M: Menu>(menu: &mut M, button: Button, slot: usize, shift: bool) -> Self {
+        let mut drag = Self {
+            button,
+            slots: Vec::new(),
+        };
+        if !shift {
+            drag.moved(menu, Some(slot));
+        }
+        drag
+    }
+
+    /// The slots spread over so far.
+    pub fn slots(&self) -> &[usize] {
+        &self.slots
+    }
+
+    /// The cursor went over `hovered` (a slot that isn't a result): the
+    /// game's drag takes it when the stack would go there
+    /// (`canItemQuickReplace`: empty or the same item) and enough items are
+    /// left for one more slot.
+    pub fn moved<M: Menu>(&mut self, menu: &mut M, hovered: Option<usize>) {
+        let (Some(slot), Some(held)) = (hovered, menu.carried()) else {
+            return;
+        };
+        if self.slots.contains(&slot) || menu.count(&held) as usize <= self.slots.len() {
+            return;
+        }
+        if menu.slot(slot).is_none_or(|s| menu.same(&s, &held)) {
+            self.slots.push(slot);
+        }
+    }
+
+    /// The release over `hovered` (`outside` the window): what the game
+    /// would do with it.
+    pub fn release(self, hovered: Option<usize>, outside: bool, shift: bool) -> Release {
+        let pickup = match self.button {
+            Button::Left => Click::Left,
+            Button::Right => Click::Right,
+        };
+        match self.slots[..] {
+            [_, _, ..] => Release::Spread(self.button, self.slots),
+            [slot] => Release::Click(slot, pickup),
+            [] if outside => Release::Throw(self.button),
+            [] => match hovered {
+                Some(slot) if shift => Release::Click(slot, Click::QuickMove),
+                Some(slot) => Release::Click(slot, pickup),
+                None => Release::Nothing,
+            },
+        }
     }
 }
 
@@ -966,161 +1076,6 @@ impl<S: Clone> Sorting<S> {
     }
 }
 
-/// A button of the settings page (Options > Mods > Mouse Tricks > Settings).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Setting {
-    /// The file is broken: its error. A click reads it again.
-    Broken,
-    RightDrag,
-    LeftDrag,
-    ShiftDrag,
-    Wheel,
-    WheelDirection,
-    WheelSearch,
-    Sort,
-    SortOrder,
-    SortHotbar,
-    /// Every setting back to its default.
-    Defaults,
-}
-/// What a click on the settings page asks of the game.
-#[derive(Clone, Debug, PartialEq)]
-pub enum Effect {
-    /// Write this configuration to the file; it applies at once.
-    Save(Config),
-    /// Read the file again (after editing it by hand).
-    Reload,
-}
-
-/// Longest error shown on the page.
-const ERROR_WIDTH: usize = 40;
-
-fn on_off(on: bool) -> &'static str {
-    if on { "ON" } else { "OFF" }
-}
-
-/// The page's buttons, in order. The wheel's and the sort's options show
-/// while they are on.
-pub fn page(loaded: &Loaded) -> Vec<Setting> {
-    let Ok(c) = loaded else {
-        return vec![Setting::Broken, Setting::Defaults];
-    };
-    let mut page = vec![
-        Setting::RightDrag,
-        Setting::LeftDrag,
-        Setting::ShiftDrag,
-        Setting::Wheel,
-    ];
-    if c.wheel {
-        page.extend([Setting::WheelDirection, Setting::WheelSearch]);
-    }
-    page.push(Setting::Sort);
-    if c.sort {
-        page.extend([Setting::SortOrder, Setting::SortHotbar]);
-    }
-    page.push(Setting::Defaults);
-    page
-}
-
-impl Setting {
-    /// Its button's label.
-    pub fn label(self, loaded: &Loaded) -> String {
-        let c = match loaded {
-            Ok(c) => c,
-            Err(error) => {
-                return match self {
-                    Self::Defaults => "Reset to defaults".into(),
-                    _ => {
-                        let mut short: String = error.chars().take(ERROR_WIDTH).collect();
-                        if short.len() < error.len() {
-                            short = format!("{}...", short.trim_end());
-                        }
-                        format!("{CONFIG_FILE}: {short} (click to reload)")
-                    }
-                };
-            }
-        };
-        match self {
-            Self::Broken => String::new(),
-            Self::RightDrag => format!("Right-drag: one item per slot: {}", on_off(c.right_drag)),
-            Self::LeftDrag => format!("Left-drag: gather same items: {}", on_off(c.left_drag)),
-            Self::ShiftDrag => format!("Shift + left-drag: move stacks: {}", on_off(c.shift_drag)),
-            Self::Wheel => format!("Wheel: move items one by one: {}", on_off(c.wheel)),
-            Self::WheelDirection => match c.wheel_direction {
-                WheelDirection::Normal => "Wheel direction: down sends, up brings back",
-                WheelDirection::Inverted => "Wheel direction: up sends, down brings back",
-                WheelDirection::Positional => "Wheel direction: items follow the wheel",
-            }
-            .into(),
-            Self::WheelSearch => match c.wheel_search {
-                WheelSearch::FirstToLast => "Wheel brings back from: first slot",
-                WheelSearch::LastToFirst => "Wheel brings back from: last slot",
-            }
-            .into(),
-            Self::Sort => format!("Sort (key or middle click): {}", on_off(c.sort)),
-            Self::SortOrder => match c.sort_order {
-                SortOrder::Registry => "Sort order: creative tabs",
-                SortOrder::Name => "Sort order: name",
-                SortOrder::Count => "Sort order: most items first",
-            }
-            .into(),
-            Self::SortHotbar => format!("Sort the hotbar too: {}", on_off(c.sort_hotbar)),
-            Self::Defaults => "Reset to defaults".into(),
-        }
-    }
-
-    /// What a click on it does to `loaded`.
-    pub fn click(self, loaded: &Loaded) -> Effect {
-        let Ok(c) = loaded else {
-            return match self {
-                Self::Defaults => Effect::Save(Config::default()),
-                _ => Effect::Reload,
-            };
-        };
-        let mut c = c.clone();
-        match self {
-            Self::Broken => return Effect::Reload,
-            Self::RightDrag => c.right_drag = !c.right_drag,
-            Self::LeftDrag => c.left_drag = !c.left_drag,
-            Self::ShiftDrag => c.shift_drag = !c.shift_drag,
-            Self::Wheel => c.wheel = !c.wheel,
-            Self::WheelDirection => {
-                c.wheel_direction = match c.wheel_direction {
-                    WheelDirection::Normal => WheelDirection::Inverted,
-                    WheelDirection::Inverted => WheelDirection::Positional,
-                    WheelDirection::Positional => WheelDirection::Normal,
-                }
-            }
-            Self::WheelSearch => {
-                c.wheel_search = match c.wheel_search {
-                    WheelSearch::FirstToLast => WheelSearch::LastToFirst,
-                    WheelSearch::LastToFirst => WheelSearch::FirstToLast,
-                }
-            }
-            Self::Sort => c.sort = !c.sort,
-            Self::SortOrder => {
-                c.sort_order = match c.sort_order {
-                    SortOrder::Registry => SortOrder::Name,
-                    SortOrder::Name => SortOrder::Count,
-                    SortOrder::Count => SortOrder::Registry,
-                }
-            }
-            Self::SortHotbar => c.sort_hotbar = !c.sort_hotbar,
-            Self::Defaults => c = Config::default(),
-        }
-        Effect::Save(c)
-    }
-}
-
-/// The settings page's labels (`native_settings`).
-pub fn labels(loaded: &Loaded) -> Vec<String> {
-    page(loaded).into_iter().map(|s| s.label(loaded)).collect()
-}
-/// A click on button `button` of the page `labels` gave (`native_settings_click`).
-pub fn click(loaded: &Loaded, button: usize) -> Option<Effect> {
-    page(loaded).get(button).map(|s| s.click(loaded))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1300,120 +1255,28 @@ mod tests {
     }
 
     #[test]
-    fn config_defaults_and_file() {
-        let c = Config::default();
-        assert!(c.right_drag && c.left_drag && c.shift_drag && c.wheel);
-        assert_eq!(Config::from_json("{}"), Ok(c.clone()));
-        assert_eq!(Config::from_json(&c.to_json()), Ok(c.clone()));
-        let json = c.to_json();
-        for key in [
-            "rightDrag",
-            "leftDrag",
-            "shiftDrag",
-            "wheel",
-            "wheelDirection",
-            "wheelSearch",
-            "sort",
-            "sortOrder",
-            "sortHotbar",
-        ] {
-            assert!(json.contains(&format!("\"{key}\"")), "{key} in {json}");
-        }
-        let positional = Config::from_json(r#"{"wheelDirection":"positional","wheel":false}"#);
-        assert_eq!(
-            positional,
-            Ok(Config {
-                wheel: false,
-                wheel_direction: WheelDirection::Positional,
-                ..Config::default()
-            })
+    fn config_reads_the_settings_with_their_defaults() {
+        let none = Config::read(|_| None, |_| None);
+        assert_eq!(none, Config::default());
+        let c = Config::read(
+            |k| (k == "wheel" || k == "sort_hotbar").then_some(k == "sort_hotbar"),
+            |k| match k {
+                "wheel_direction" => Some(2),
+                "wheel_search" => Some(1),
+                "sort_order" => Some(2),
+                _ => None,
+            },
         );
-        assert!(Config::from_json(r#"{"rightdrag":true}"#).is_err());
-        assert!(Config::from_json(r#"{"wheelSearch":"middle"}"#).is_err());
-        let sort = Config::from_json(r#"{"sortOrder":"count","sortHotbar":true}"#);
-        assert_eq!(
-            sort,
-            Ok(Config {
-                sort_order: SortOrder::Count,
-                sort_hotbar: true,
-                ..Config::default()
-            })
-        );
-        assert!(Config::from_json(r#"{"sortOrder":"colour"}"#).is_err());
-        assert!(Config::from_json("not json").is_err());
-    }
-
-    #[test]
-    fn settings_page_cycles_and_resets() {
-        let loaded: Loaded = Ok(Config::default());
-        let labels = labels(&loaded);
-        assert_eq!(labels.len(), 10);
-        assert_eq!(labels[0], "Right-drag: one item per slot: ON");
-        assert_eq!(labels[4], "Wheel direction: down sends, up brings back");
-        assert_eq!(labels[5], "Wheel brings back from: last slot");
-        assert_eq!(labels[6], "Sort (key or middle click): ON");
-        assert_eq!(labels[7], "Sort order: creative tabs");
-        assert_eq!(labels[8], "Sort the hotbar too: OFF");
-        let Some(Effect::Save(off)) = click(&loaded, 0) else {
-            panic!("a toggle saves");
-        };
-        assert!(!off.right_drag);
-        let mut c = Config::default();
-        for want in [
-            WheelDirection::Inverted,
-            WheelDirection::Positional,
-            WheelDirection::Normal,
-        ] {
-            let Some(Effect::Save(next)) = click(&Ok(c.clone()), 4) else {
-                panic!("the direction cycles");
-            };
-            assert_eq!(next.wheel_direction, want);
-            c = next;
+        assert!(!c.wheel && c.sort_hotbar && c.right_drag);
+        assert_eq!(c.wheel_direction, WheelDirection::Positional);
+        assert_eq!(c.wheel_search, WheelSearch::FirstToLast);
+        assert_eq!(c.sort_order, SortOrder::Count);
+        // Every setting has a default matching Config's.
+        for s in SETTINGS {
+            if let Setting::Choice(_, options, default) = s {
+                assert!(default < options.len());
+            }
         }
-        let mut c = Config::default();
-        for want in [SortOrder::Name, SortOrder::Count, SortOrder::Registry] {
-            let Some(Effect::Save(next)) = click(&Ok(c.clone()), 7) else {
-                panic!("the sort order cycles");
-            };
-            assert_eq!(next.sort_order, want);
-            c = next;
-        }
-        let Some(Effect::Save(hotbar)) = click(&loaded, 8) else {
-            panic!("a toggle saves");
-        };
-        assert!(hotbar.sort_hotbar);
-        // The wheel's and the sort's options hide while they are off.
-        let no_wheel: Loaded = Ok(Config {
-            wheel: false,
-            ..Config::default()
-        });
-        assert_eq!(page(&no_wheel).len(), 8);
-        assert_eq!(page(&no_wheel)[4], Setting::Sort);
-        assert_eq!(page(&no_wheel)[7], Setting::Defaults);
-        assert_eq!(click(&no_wheel, 7), Some(Effect::Save(Config::default())));
-        assert_eq!(click(&no_wheel, 9), None);
-        let no_sort: Loaded = Ok(Config {
-            sort: false,
-            ..Config::default()
-        });
-        assert_eq!(page(&no_sort).len(), 8);
-        assert_eq!(page(&no_sort)[6], Setting::Sort);
-        assert_eq!(page(&no_sort)[7], Setting::Defaults);
-        assert_eq!(
-            Setting::Sort.label(&no_sort),
-            "Sort (key or middle click): OFF"
-        );
-    }
-
-    #[test]
-    fn a_broken_file_shows_its_error() {
-        let broken: Loaded = Err("unknown field `rightdrag`, expected one of many".into());
-        let labels = labels(&broken);
-        assert_eq!(labels.len(), 2);
-        assert!(labels[0].starts_with("config.json: unknown field"));
-        assert!(labels[0].ends_with("... (click to reload)"));
-        assert_eq!(click(&broken, 0), Some(Effect::Reload));
-        assert_eq!(click(&broken, 1), Some(Effect::Save(Config::default())));
     }
 
     #[test]
@@ -2262,5 +2125,49 @@ mod tests {
             assert!(again.done(), "round {round}");
         }
         assert!(clicks > 0);
+    }
+    #[test]
+    fn a_taken_press_does_what_the_games_drag_would() {
+        // A right press holding 3 on an empty slot, released on it: one click.
+        let mut menu = Fake::chest().holding("stone", 3);
+        let drag = QuickCraft::start(&mut menu, Button::Right, 300, false);
+        assert_eq!(drag.slots(), &[300]);
+        assert_eq!(
+            drag.release(Some(300), false, false),
+            Release::Click(300, Click::Right)
+        );
+        // A left drag over two slots that take the stack spreads it; a slot
+        // of another item is skipped; never more slots than items.
+        let mut menu = Fake::chest()
+            .holding("stone", 2)
+            .with(301, "dirt", 1)
+            .with(302, "stone", 5);
+        let mut drag = QuickCraft::start(&mut menu, Button::Left, 300, false);
+        drag.moved(&mut menu, Some(301));
+        drag.moved(&mut menu, Some(302));
+        drag.moved(&mut menu, Some(303));
+        assert_eq!(
+            drag.release(Some(303), false, false),
+            Release::Spread(Button::Left, vec![300, 302])
+        );
+        // Shift starts it empty: the release is a Shift click where it ends.
+        let mut menu = Fake::chest().holding("stone", 2).with(301, "dirt", 1);
+        let drag = QuickCraft::start(&mut menu, Button::Left, 301, true);
+        assert_eq!(
+            drag.release(Some(301), false, true),
+            Release::Click(301, Click::QuickMove)
+        );
+        // A press on another item starts nothing: the release swaps there,
+        // or drops outside.
+        let mut menu = Fake::chest().holding("stone", 2).with(301, "dirt", 1);
+        let drag = QuickCraft::start(&mut menu, Button::Left, 301, false);
+        assert_eq!(
+            drag.clone().release(Some(301), false, false),
+            Release::Click(301, Click::Left)
+        );
+        assert_eq!(
+            drag.release(None, true, false),
+            Release::Throw(Button::Left)
+        );
     }
 }

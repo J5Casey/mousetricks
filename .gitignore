@@ -1,2 +1,6 @@
 /target/
+/engine/target/
 /dist/
+.horizon/
+# The SDK-resolved lock of local checks; the mod has no registry dependencies to pin.
+/Cargo.lock

@@ -1,16 +1,20 @@
+# Mouse Tricks: a native mod on the arismoko/horizon mod API. The launcher
+# compiles this crate against the prebuilt SDK of the commit horizon-mod.toml
+# pins; the SDK dependency must be this exact path. For local checks against
+# a developer base, link a checkout of the pin:
+#   mkdir -p .horizon/sdk && ln -s <checkout> .horizon/sdk/api
+# The engine's tests run without it (engine/).
 [package]
 name = "horizon-mousetricks"
-version = "0.2.2"
+version = "0.3.0"
 edition = "2024"
-rust-version = "1.95"
 license = "MIT"
-description = "Mouse Tricks: inventory mouse drags and wheel moves for Horizon, as a native mod"
+description = "Mouse Tricks: inventory mouse drags, wheel moves and sorting for Horizon"
 publish = false
+autotests = false
 
 [lib]
-# This exact source is also injected as `crate::game::mousetricks` by horizon-mixins.
-path = "mixins/mousetricks/runtime.rs"
+path = "src/lib.rs"
 
 [dependencies]
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+horizon-mod-api = { path = ".horizon/sdk/api/crates/horizon-mod-api" }

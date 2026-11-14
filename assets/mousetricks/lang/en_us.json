@@ -1,0 +1,20 @@
+{
+  "mousetricks.key.sort": "Sort the inventory",
+  "mousetricks.setting.right_drag": "Right-drag: one item per slot",
+  "mousetricks.setting.left_drag": "Left-drag: gather same items",
+  "mousetricks.setting.shift_drag": "Shift + left-drag: move stacks",
+  "mousetricks.setting.wheel": "Wheel: move items one by one",
+  "mousetricks.setting.wheel_direction": "Wheel direction",
+  "mousetricks.setting.wheel_direction.normal": "Down sends, up brings back",
+  "mousetricks.setting.wheel_direction.inverted": "Up sends, down brings back",
+  "mousetricks.setting.wheel_direction.positional": "Items follow the wheel",
+  "mousetricks.setting.wheel_search": "Wheel brings back from",
+  "mousetricks.setting.wheel_search.last_to_first": "Last slot",
+  "mousetricks.setting.wheel_search.first_to_last": "First slot",
+  "mousetricks.setting.sort": "Sort (key or middle click)",
+  "mousetricks.setting.sort_order": "Sort order",
+  "mousetricks.setting.sort_order.registry": "Creative tabs",
+  "mousetricks.setting.sort_order.name": "Name",
+  "mousetricks.setting.sort_order.count": "Most items first",
+  "mousetricks.setting.sort_hotbar": "Sort the hotbar too"
+}

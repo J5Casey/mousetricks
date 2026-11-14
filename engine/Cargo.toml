@@ -1,0 +1,14 @@
+# Mouse Tricks' engine (src/engine.rs, no Horizon types) built on its own, so
+# its tests run with plain `cargo test` and no SDK. Not part of the .hmod.
+[package]
+name = "mousetricks-engine"
+version = "0.3.0"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT"
+publish = false
+
+[lib]
+path = "../src/engine.rs"
+
+[workspace]
