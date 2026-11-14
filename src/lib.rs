@@ -22,7 +22,7 @@
 //! - The engine numbers slots as the game's inventory does (0..9 the hotbar,
 //!   9..36 the main inventory, anything else the menu's own); the glue maps
 //!   those to the menu's slot order and back (`Open`).
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 
 pub mod engine;
 
