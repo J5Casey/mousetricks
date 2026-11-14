@@ -104,7 +104,7 @@ Horizon has a built-in, off-by-default extra with similar controls (Options > Ho
 ## Compatibility
 
 Mouse Tricks uses only the mod API (no game internals, no `[native.*]` rows), so it is not tied to one game build's
-private functions. It is pinned (`horizon-mod.toml` `[native]`) to J5Casey/horizon `braid/ari-base` `9a4998a86c`
+private functions. It is pinned (`horizon-mod.toml` `[native]`) to J5Casey/horizon `braid/ari-base` `86c2820370`
 (the base every Braid mod pins).
 
 Every item it moves is a `MenuRef::click`: the clicks a hand makes, predicted on your side and sent as ordinary

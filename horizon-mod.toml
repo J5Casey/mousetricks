@@ -11,8 +11,8 @@ capabilities = ["registries"]
 
 [native]
 game = "26.3"
-# J5Casey/horizon braid/ari-base 9a4998a86c, a local developer base frozen for the whole pack:
+# J5Casey/horizon braid/ari-base 86c2820370, a local developer base frozen for the whole pack:
 # arismoko/horizon main b7a155fea5 + #4143 (destroy_block) + #4252 (fishing_medium) + #4236 (loot_odds)
-# + #4263 (recipe_book_ids) + #4276 (synced recipe ids).
-horizon = "9a4998a86c4a6ee2c6739d4069fcd0813542a7ee"
+# + #4263 (recipe_book_ids) + #4276 (synced recipe ids, one book id per vanilla recipe).
+horizon = "86c282037053a0d30ecadb5feede97b030a47d37"
 mixins = "e59da9094f0c2fdda6c627fe9eff22dec6a906f0"
