@@ -1,4 +1,4 @@
-# Mouse Tricks' engine (src/engine.rs, no Horizon types) built on its own, so
+# Mouse Tricks' engine (src/engine.rs, no game types) built on its own, so
 # its tests run with plain `cargo test` and no SDK. Not part of the .hmod.
 [package]
 name = "mousetricks-engine"

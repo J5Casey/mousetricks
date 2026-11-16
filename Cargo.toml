@@ -1,8 +1,8 @@
-# Mouse Tricks: a native mod on the arismoko/horizon mod API. The launcher
-# compiles this crate against the prebuilt SDK of the commit horizon-mod.toml
+# Mouse Tricks: a native mod on the Sunrise mod API. The launcher
+# compiles this crate against the prebuilt SDK of the commit sunrise-mod.toml
 # pins; the SDK dependency must be this exact path. For local checks against
 # a developer base, link a checkout of the pin:
-#   mkdir -p .horizon/sdk && ln -s <checkout> .horizon/sdk/api
+#   mkdir -p .sunrise/sdk && ln -s <checkout> .sunrise/sdk/api
 # The engine's tests run without it (engine/).
 [package]
 name = "horizon-mousetricks"
@@ -17,4 +17,4 @@ autotests = false
 path = "src/lib.rs"
 
 [dependencies]
-horizon-mod-api = { path = ".horizon/sdk/api/crates/horizon-mod-api" }
+sunrise-mod-api = { path = ".sunrise/sdk/api/crates/sunrise-mod-api" }

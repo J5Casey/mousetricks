@@ -1,5 +1,5 @@
 //! Mouse Tricks for Horizon: inventory mouse drags, wheel moves and sorting,
-//! as a native mod on the mod API (`horizon-mod-api`, lib `mod_api`).
+//! as a native mod on the mod API (`sunrise-mod-api`, lib `mod_api`).
 //!
 //! Everything the tricks decide is in `engine.rs`, which knows nothing of
 //! Horizon. This file binds it to the open inventory screen: the menu's
@@ -96,7 +96,7 @@ fn roles(menu: Option<&str>, slots: usize) -> Option<Vec<Role>> {
             roles.extend(std::iter::repeat_n(Role::Grid, slots.checked_sub(36)?));
             player(&mut roles);
         }
-        Some(m) if m.starts_with("horizon:mount") => {
+        Some(m) if m.starts_with("sunrise:mount") => {
             roles.extend([Role::Equipment; 2]);
             roles.extend(std::iter::repeat_n(Role::Storage, slots.checked_sub(38)?));
             player(&mut roles);
@@ -602,7 +602,7 @@ fn kind(host: &dyn ClientHost, st: &mut State, stack: &ItemStack) -> Kind {
     }
 }
 
-#[mod_api::horizon_mod]
+#[mod_api::sunrise_mod]
 impl Hooks for MouseTricks {
     fn register(&self, r: &mut dyn Registrar, _cx: &RegistrationContext) {
         r.register_key_mapping(
@@ -837,7 +837,7 @@ mod tests {
         assert_eq!(table[10], Role::Main(9));
         assert!(roles(Some("minecraft:furnace"), 39).is_none());
         assert!(roles(Some("minecraft:generic_9x3"), 20).is_none());
-        let mount = roles(Some("horizon:mount5"), 53).unwrap();
+        let mount = roles(Some("sunrise:mount5"), 53).unwrap();
         assert_eq!(
             &mount[..3],
             &[Role::Equipment, Role::Equipment, Role::Storage]
