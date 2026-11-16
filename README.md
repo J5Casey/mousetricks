@@ -30,9 +30,9 @@ and Mouse Tricks needs nothing on the server.
 
 Where: every menu whose slots are all plain ones: the player's inventory screen (crafting grid and armour slots
 included for the drags), chests, barrels, ender chests, shulker boxes, hoppers, dispensers and droppers, the crafting
-table, the crafter, a horse's or llama's chest, in single player, on LAN and on servers. The mod knows these menus by
-their type ids. A content mod's menu type (a crafting station, say) clicks as the game's own: the mod API gives a
-client no way to ask what a mod menu's slots are for (see Compatibility). Screens with a machine's own slots (furnaces, brewing stands,
+table, the crafter, a horse's or llama's chest, and a content mod's storage or crafting menu (a crafting station and
+its linked chests), in single player, on LAN and on servers. The game says what each slot is for
+(`MenuRef::slot_kinds`). Screens with a machine's own slots (furnaces, brewing stands,
 anvils, villagers, enchanting tables) and the creative inventory click exactly as before. The wheel over a crafting
 grid's slot trades with your inventory (down sends one item back, up brings one more of it into the grid).
 
@@ -121,15 +121,12 @@ Every item it moves is a `MenuRef::click`: the clicks a hand makes, predicted on
 - `render_frame_pre`: those clicks, and a paced sort's.
 - `input_key`: the sort key (`screen_char_typed_pre` tells a key typed into a text box, the recipe book's search,
   apart from a command).
-- `screen_render_post`: which menu is open (`ScreenView.menu`, its slot count and panel).
+- `screen_render_post`: which menu is open (`ScreenView.menu`, its panel) and what its slots are for (`MenuRef::slot_kinds`, read once per menu).
 
 What the API doesn't give a client, and what Mouse Tricks does instead:
 
 | Missing | Instead |
 | --- | --- |
-| What each slot of a content mod's menu is for (`MenuRef::slot_backing` is server-only) | Vanilla menus by type id; mod menus are left alone |
-| The creative tabs' order | The item registry's order |
-| A stack's shown name (an anvil name) | The item's translated name |
 | Which keys vanilla's mappings are bound to | A hotbar key bound to a mouse button is no longer left alone |
 | Whether the game's drag can be dropped | The press is taken from the game (above) |
 | Shift + double click with a stack in hand (move all of a kind) | Not done |

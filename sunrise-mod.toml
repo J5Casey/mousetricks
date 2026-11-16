@@ -1,6 +1,6 @@
 id = "mousetricks"
 name = "Mouse Tricks"
-version = "0.3.0"
+version = "0.4.0"
 description = "Right-drag places one item per slot, left-drag gathers or moves stacks, the wheel moves items one by one, a key or a middle click sorts."
 authors = ["d3grando"]
 # A native mod on the mod API only (no [native.*] rows, no game internals):
@@ -12,6 +12,7 @@ capabilities = ["registries"]
 [native]
 game = "26.3"
 # J5Casey/sunrise braid/sun-base, a local developer base frozen for the whole pack:
-# sunrise-org/sunrise main d1dce85911 + sunrise#1390 (loot_odds) + sunrise#1404 (fishing_medium).
-sunrise = "74ab4c33e52fc67f14d18ace629fa78ff012ebb7"
+# sunrise-org/sunrise main d1dce85911 + sunrise#1390 (loot_odds) + sunrise#1404 (fishing_medium)
+# + creative_search_items (sunrise#1516).
+sunrise = "2ed34a10feca6762514db1295603b7355f5b39d1"
 mixins = "e59da9094f0c2fdda6c627fe9eff22dec6a906f0"

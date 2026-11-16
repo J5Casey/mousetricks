@@ -6,7 +6,7 @@
 # The engine's tests run without it (engine/).
 [package]
 name = "horizon-mousetricks"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 license = "MIT"
 description = "Mouse Tricks: inventory mouse drags, wheel moves and sorting for Horizon"

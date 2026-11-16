@@ -32,9 +32,9 @@ use engine::{
 };
 use mod_api::{
     ClientHost, DragKind, Flow, Hooks, InputKeyEvent, ItemKey, ItemStack, KeyAction,
-    KeyConflictContext, KeyRegistration, MenuClick, MenuRef, MouseButton, MouseButtonPreEvent,
-    Registrar, RegistrationContext, RenderFramePreEvent, ScreenCharTypedPreEvent,
-    ScreenMouseButtonPressedPreEvent, ScreenMouseButtonReleasedPreEvent,
+    KeyConflictContext, KeyRegistration, MenuClick, MenuRef, MenuSlotKind, MouseButton,
+    MouseButtonPreEvent, Registrar, RegistrationContext, RenderFramePreEvent,
+    ScreenCharTypedPreEvent, ScreenMouseButtonPressedPreEvent, ScreenMouseButtonReleasedPreEvent,
     ScreenMouseDraggedPreEvent, ScreenMouseScrolledPreEvent, ScreenRenderPostEvent, ScreenView,
     SettingSpec, Tag,
 };
@@ -58,52 +58,39 @@ enum Role {
     Result,
 }
 
-/// The roles of a menu's slots, in menu order, from its type id (None: the
-/// player's own inventory) and slot count, when every slot is one Mouse
-/// Tricks works with: the inventory, the crafting table, chests, barrels,
-/// shulker boxes, ender chests, hoppers, dispensers, droppers, the crafter
-/// and a mount's chest. None for any other menu (furnaces, anvils,
-/// villagers, workstations, a content mod's menu type): there the screen
-/// clicks as the game's own.
-fn roles(menu: Option<&str>, slots: usize) -> Option<Vec<Role>> {
-    let player = |roles: &mut Vec<Role>| {
-        roles.extend((0..27).map(|i| Role::Main(9 + i)));
-        roles.extend((0..9).map(Role::Hotbar));
-    };
-    let mut roles = Vec::with_capacity(slots);
-    match menu {
-        None => {
-            roles.push(Role::Result);
-            roles.extend([Role::Grid; 4]);
-            roles.extend([Role::Equipment; 4]);
-            player(&mut roles);
-            roles.push(Role::Equipment);
-        }
-        Some("minecraft:crafting") => {
-            roles.push(Role::Result);
-            roles.extend([Role::Grid; 9]);
-            player(&mut roles);
-        }
-        Some(m) if m.starts_with("minecraft:generic_9x") || m == "minecraft:shulker_box" => {
-            roles.extend(std::iter::repeat_n(Role::Storage, slots.checked_sub(36)?));
-            player(&mut roles);
-        }
-        Some("minecraft:hopper" | "minecraft:generic_3x3") => {
-            roles.extend(std::iter::repeat_n(Role::Storage, slots.checked_sub(36)?));
-            player(&mut roles);
-        }
-        Some("minecraft:crafter_3x3") => {
-            roles.extend(std::iter::repeat_n(Role::Grid, slots.checked_sub(36)?));
-            player(&mut roles);
-        }
-        Some(m) if m.starts_with("sunrise:mount") => {
-            roles.extend([Role::Equipment; 2]);
-            roles.extend(std::iter::repeat_n(Role::Storage, slots.checked_sub(38)?));
-            player(&mut roles);
-        }
-        Some(_) => return None,
+/// The roles of a menu's slots, in menu order, from what the game says
+/// each slot is for (`MenuRef::slot_kinds`, a content mod's menu type too),
+/// when every slot is one Mouse Tricks works with: the inventory, the
+/// crafting table, chests, barrels, shulker boxes, ender chests, hoppers,
+/// dispensers, droppers, the crafter, a mount's chest and a content mod's
+/// storage or crafting menu (a crafting station's linked chests). None for
+/// any other menu (furnaces and the brewing stand, whose slots take items by
+/// kind; anvils, villagers and workstations with slots of no known role):
+/// there the screen clicks as the game's own. `menu` is the menu's type.
+fn roles(menu: Option<&str>, kinds: &[MenuSlotKind]) -> Option<Vec<Role>> {
+    if matches!(
+        menu,
+        Some(
+            "minecraft:furnace"
+                | "minecraft:blast_furnace"
+                | "minecraft:smoker"
+                | "minecraft:brewing_stand"
+        )
+    ) {
+        return None;
     }
-    (roles.len() == slots).then_some(roles)
+    kinds
+        .iter()
+        .map(|kind| match *kind {
+            MenuSlotKind::Player(n @ 0..9) => Some(Role::Hotbar(n as usize)),
+            MenuSlotKind::Player(n @ 9..36) => Some(Role::Main(n as usize)),
+            MenuSlotKind::Player(_) | MenuSlotKind::Equipment => Some(Role::Equipment),
+            MenuSlotKind::Storage => Some(Role::Storage),
+            MenuSlotKind::CraftingGrid => Some(Role::Grid),
+            MenuSlotKind::Result => Some(Role::Result),
+            _ => None,
+        })
+        .collect()
 }
 
 /// The open inventory screen as the engine sees it: its menu, the roles of
@@ -197,9 +184,8 @@ struct State {
     /// The last key's character went into a text box.
     typed_in_field: bool,
     pending: Vec<Pending>,
-    /// Each item's place in the item registry, then its name, for sorting.
+    /// Each item's place in the item registry, for sorting what the creative tabs don't show.
     order: HashMap<ItemKey, u64>,
-    names: HashMap<ItemKey, String>,
 }
 
 #[derive(Default)]
@@ -526,10 +512,11 @@ impl MouseTricks {
             open: &open,
         };
         let snapshot = engine::snapshot(&mut reads, &slots);
+        let creative = host.creative_search_items();
         let kinds: Vec<Kind> = snapshot
             .stacks
             .iter()
-            .map(|s| kind(&*host, &mut st, s))
+            .map(|s| kind(&*host, &mut st, &creative, s))
             .collect();
         let steps = engine::plan_sort(&snapshot.pieces, &kinds, config.sort_order);
         // On a server the clicks go out at a steady pace; in a world of the
@@ -569,10 +556,11 @@ fn near(host: &dyn ClientHost, open: &Open, mouse: [f32; 2]) -> bool {
     nearest(false) < nearest(true)
 }
 
-/// What a sort knows of `stack`'s kind: its item's place in the item
-/// registry, its name, its damage, whether it is a bundle (which stays
-/// where it is).
-fn kind(host: &dyn ClientHost, st: &mut State, stack: &ItemStack) -> Kind {
+/// What a sort knows of `stack`'s kind: its place in the creative tabs
+/// (`creative`, the search tab's stacks: the same stack's place, else its
+/// item's first), the item registry's after them; its shown name, its
+/// damage, whether it is a bundle (which stays where it is).
+fn kind(host: &dyn ClientHost, st: &mut State, creative: &[ItemStack], stack: &ItemStack) -> Kind {
     if st.order.is_empty() {
         st.order = host
             .item_keys()
@@ -581,22 +569,22 @@ fn kind(host: &dyn ClientHost, st: &mut State, stack: &ItemStack) -> Kind {
             .map(|(i, k)| (k, i as u64))
             .collect();
     }
-    let item = stack.item();
-    let name = st
-        .names
-        .entry(item)
-        .or_insert_with(|| {
-            let id = item.id(host);
-            let (ns, path) = id.split_once(':').unwrap_or(("minecraft", &id));
-            host.translate(&format!("item.{ns}.{path}"))
-                .or_else(|| host.translate(&format!("block.{ns}.{path}")))
-                .unwrap_or_else(|| path.to_owned())
-        })
-        .clone();
+    let order = creative
+        .iter()
+        .position(|s| s.is_stackable_with(stack))
+        .or_else(|| creative.iter().position(|s| s.same_item(stack)))
+        .map_or_else(
+            || {
+                st.order
+                    .get(&stack.item())
+                    .map_or(u64::MAX, |i| creative.len() as u64 + i)
+            },
+            |i| i as u64,
+        );
     Kind {
         max: max_of(host, stack),
-        order: st.order.get(&item).copied().unwrap_or(u64::MAX),
-        name,
+        order,
+        name: host.hover_name(stack),
         damage: stack.damage(),
         pinned: is_bundle(host, stack),
     }
@@ -808,10 +796,17 @@ fn follow(st: &mut State, host: &dyn ClientHost, screen: &ScreenView<'_>) {
     let menu = (screen.id == "inventory")
         .then(|| host.local_player()?.container_menu(host))
         .flatten();
+    if let (Some(open), Some(menu)) = (st.open.as_mut(), menu)
+        && open.menu == menu
+    {
+        // The roles stay the same while the menu does.
+        open.rect = screen.rect;
+        return;
+    }
     st.open = menu.and_then(|menu| {
         Some(Open {
             menu,
-            roles: roles(screen.menu, screen.slots)?,
+            roles: roles(screen.menu, &menu.slot_kinds(host)?)?,
             rect: screen.rect,
         })
     });
@@ -821,27 +816,49 @@ fn follow(st: &mut State, host: &dyn ClientHost, screen: &ScreenView<'_>) {
 mod tests {
     use super::*;
 
+    use MenuSlotKind::{CraftingGrid, Equipment, Other, Player, Result, Storage};
+
+    /// The 36 player slots every container menu ends with.
+    fn player() -> Vec<MenuSlotKind> {
+        (9..36).chain(0..9).map(Player).collect()
+    }
+
     #[test]
-    fn roles_of_the_plain_menus() {
-        let inv = roles(None, 46).unwrap();
+    fn roles_from_the_slot_kinds() {
+        let mut inventory = vec![
+            Result,
+            CraftingGrid,
+            CraftingGrid,
+            CraftingGrid,
+            CraftingGrid,
+        ];
+        inventory.extend((36..40).rev().map(Player));
+        inventory.extend(player());
+        inventory.push(Player(40));
+        let inv = roles(None, &inventory).unwrap();
         assert_eq!(inv[0], Role::Result);
+        assert_eq!(inv[5], Role::Equipment);
         assert_eq!(inv[9], Role::Main(9));
         assert_eq!(inv[36], Role::Hotbar(0));
         assert_eq!(inv[45], Role::Equipment);
-        let chest = roles(Some("minecraft:generic_9x3"), 63).unwrap();
-        assert_eq!(chest[26], Role::Storage);
-        assert_eq!(chest[27], Role::Main(9));
-        assert_eq!(chest[62], Role::Hotbar(8));
-        let table = roles(Some("minecraft:crafting"), 46).unwrap();
-        assert_eq!(table[9], Role::Grid);
-        assert_eq!(table[10], Role::Main(9));
-        assert!(roles(Some("minecraft:furnace"), 39).is_none());
-        assert!(roles(Some("minecraft:generic_9x3"), 20).is_none());
-        let mount = roles(Some("sunrise:mount5"), 53).unwrap();
+        // A content mod's crafting station: grid, result, linked chests.
+        let mut station = vec![CraftingGrid; 9];
+        station.push(Result);
+        station.extend([Storage; 27]);
+        station.extend(player());
+        let station = roles(Some("braid:crafting_station"), &station).unwrap();
+        assert_eq!(station[8], Role::Grid);
+        assert_eq!(station[10], Role::Storage);
+        assert_eq!(station[37], Role::Main(9));
+        let mut mount = vec![Equipment, Equipment, Storage];
+        mount.extend(player());
         assert_eq!(
-            &mount[..3],
-            &[Role::Equipment, Role::Equipment, Role::Storage]
+            roles(Some("sunrise:mount1"), &mount).unwrap()[1],
+            Role::Equipment
         );
-        assert_eq!(mount[17], Role::Main(9));
+        let mut furnace = vec![Storage, Storage, Result];
+        furnace.extend(player());
+        assert!(roles(Some("minecraft:furnace"), &furnace).is_none());
+        assert!(roles(Some("minecraft:anvil"), &[Other; 39]).is_none());
     }
 }
