@@ -13,6 +13,7 @@ capabilities = ["registries"]
 game = "26.3"
 # J5Casey/sunrise braid/sun-base, a local developer base frozen for the whole pack:
 # sunrise-org/sunrise main d1dce85911 + sunrise#1390 (loot_odds) + sunrise#1404 (fishing_medium)
-# + creative_search_items (sunrise#1516).
-sunrise = "2ed34a10feca6762514db1295603b7355f5b39d1"
+# + creative_search_items + sunrise#1515 (transfer_recipe_check by recipe id)
+# + the crafting table's recipe book on a server (sunrise#1525).
+sunrise = "d5ed781354d311d67117282d6a74b20d00894dc5"
 mixins = "e59da9094f0c2fdda6c627fe9eff22dec6a906f0"
