@@ -584,7 +584,10 @@ fn kind(host: &dyn ClientHost, st: &mut State, creative: &[ItemStack], stack: &I
     Kind {
         max: max_of(host, stack),
         order,
-        name: host.hover_name(stack),
+        name: host
+            .hover_name(stack)
+            .and_then(|t| host.text_string(&t))
+            .unwrap_or_default(),
         damage: stack.damage(),
         pinned: is_bundle(host, stack),
     }
@@ -592,7 +595,7 @@ fn kind(host: &dyn ClientHost, st: &mut State, creative: &[ItemStack], stack: &I
 
 #[mod_api::sunrise_mod]
 impl Hooks for MouseTricks {
-    fn register(&self, r: &mut dyn Registrar, _cx: &RegistrationContext) {
+    fn register(&self, r: &mut dyn Registrar, cx: &RegistrationContext) {
         r.register_key_mapping(
             KeyRegistration::new(engine::SORT_KEY, engine::SORT_KEY_DEFAULT)
                 .label("mousetricks.key.sort")
@@ -614,7 +617,7 @@ impl Hooks for MouseTricks {
             };
             let key = spec.key.clone();
             if let Err(e) = r.register_setting(spec) {
-                r.registration_refusal(format!("Mouse Tricks setting {key}: {e}"));
+                cx.refuse(&format!("Mouse Tricks setting {key}: {e}"));
             }
         }
     }
